@@ -1,0 +1,30 @@
+{
+  "_comment": "R4: response models graphiti-core requests during a real add_episode run. Regenerate with `python scripts/record_prompt_manifest.py` after bumping the graphiti-core pin, and read the diff before extending the dispatch table.",
+  "graphiti_core_version": "0.29.3",
+  "expected_models": [
+    "EdgeDuplicate",
+    "ExtractedEdges",
+    "ExtractedEntities",
+    "NodeResolutions",
+    "SummarizedEntities"
+  ],
+  "conditional_models": [
+    "EdgeTimestamps",
+    "BatchEdgeTimestamps",
+    "Summary",
+    "SummaryDescription",
+    "EntitySummary",
+    "SummarizedEntity",
+    "CombinedExtraction",
+    "NodeDuplicate",
+    "SagaSummary"
+  ],
+  "_conditional_comment": "Prompts that only fire on some code paths (explicit dates in a fact, community building, saga episodes). They must have handlers, but a recording run need not exercise them.",
+  "ontology_models": [
+    "Document",
+    "Employee",
+    "Organization",
+    "Product",
+    "Repository"
+  ]
+}

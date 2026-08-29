@@ -1,0 +1,36 @@
+.venv/
+venv/
+var/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.ruff_cache/
+.cache/
+.llm_cache.json
+*.llm_cache.json
+
+# Databases & logs
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data.db
+synapse.db
+*.log
+error.log
+seed_err.txt
+seed_out.txt
+test.txt
+
+# Scratch & ad-hoc test scripts
+scratch/
+test_*.py
+clean_telemetry.py
+fix_bindings.py
+revert_proposals.py
+agent_telemetry/

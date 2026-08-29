@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-paper: #F6F6F4;
+    --color-ink: #1B1C1E;
+    --color-ink-muted: #5B5D62;
+    --color-ledger: #2B4570;
+    --color-signal: #B8863E;
+    --color-alert: #A23B2E;
+    --color-confirmed: #3F6B4F;
+    --color-hairline: #DDDCD7;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+
+  /* Focus ring utility class applied globally via spec: 
+     Focus: visible 2px ledger outline, 2px offset, every focusable element, never suppressed */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ledger ring-offset-2 ring-offset-paper;
+  }
+}
+
+/* ── Graph viewer loading animation ───────────────────────────────────────── */
+@keyframes graph-orbit {
+  from { transform: rotate(0deg) translateX(32px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(32px) rotate(-360deg); }
+}
+
+.graph-orbit-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background-color: var(--color-ledger);
+  animation: graph-orbit 1.6s linear infinite;
+}
+.graph-orbit-dot:nth-child(1) { animation-delay:  0s;   opacity: 1.00; }
+.graph-orbit-dot:nth-child(2) { animation-delay: -0.4s; opacity: 0.80; }
+.graph-orbit-dot:nth-child(3) { animation-delay: -0.8s; opacity: 0.60; }
+.graph-orbit-dot:nth-child(4) { animation-delay: -1.2s; opacity: 0.40; }
+
+@keyframes graph-ring-expand {
+  0%   { transform: scale(0.6); opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+@keyframes graph-progress-pulse {
+  from { width: 78%; }
+  to   { width: 88%; }
+}

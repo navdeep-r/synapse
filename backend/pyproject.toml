@@ -1,0 +1,75 @@
+[project]
+name = "synapse-backend"
+version = "2.0.0"
+description = "Synapse Knowledge Intelligence Platform — Graphiti-based KG construction layer (v2)"
+requires-python = "==3.12.*"
+dependencies = [
+    "graphiti-core==0.29.3",
+    "falkordb>=1.2.0",
+    "redis<5.1.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.9",
+    "aiosqlite>=0.20.0",
+    "pydantic>=2.11.5",
+    "pydantic-settings>=2.6.0",
+    "fastavro>=1.9.0",
+    "pymupdf>=1.24.0",
+    "pypdf>=5.1.0",
+    "python-docx>=1.1.2",
+    "beautifulsoup4>=4.12.3",
+    "httpx>=0.27.2",
+    "PyJWT>=2.8.0",
+    "cryptography>=42.0.0",
+    "bcrypt>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.2",
+    "ruff>=0.7.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "app",
+    "github",
+    "kg_acl",
+    "kg_audit",
+    "kg_chunking",
+    "kg_contracts",
+    "kg_export",
+    "kg_graphiti",
+    "kg_ingest",
+    "kg_observability",
+    "kg_ontology",
+    "kg_parsing",
+    "kg_prefilter",
+    "kg_query",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# The embedded FalkorDB server is session-scoped and its redis connections are
+# bound to the loop that created them, so tests must share that same loop.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008: FastAPI's Depends()/File() defaults are the documented idiom.
+# UP042: `str, Enum` keeps these values JSON-serializable on Pydantic v2 without
+#        the StrEnum repr change; switching would alter serialized payloads.
+ignore = ["E501", "B008", "UP042"]

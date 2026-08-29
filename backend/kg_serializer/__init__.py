@@ -1,0 +1,1 @@
+"""Canonical node serialization layer."""

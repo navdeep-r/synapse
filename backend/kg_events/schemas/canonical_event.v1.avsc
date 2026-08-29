@@ -1,0 +1,169 @@
+{
+  "type": "record",
+  "namespace": "com.synapse.ingestion.v1",
+  "name": "CanonicalEvent",
+  "doc": "The only shape permitted on the unified ingestion topic. Connectors parse, validate and map into this; everything downstream of the queue reads nothing else. Compatibility mode on the registry subject is BACKWARD: consumers are upgraded before producers, so new fields MUST carry a default and fields MUST NOT be removed or retyped in place.",
+  "fields": [
+    {
+      "name": "schema_version",
+      "type": "int",
+      "default": 1,
+      "doc": "Semantic version of this contract. The registry enforces wire compatibility; this field is for humans and for consumers that branch on behaviour."
+    },
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "UUID unique to this emission. NOT the dedup key — a redelivery of the same logical change carries a NEW event_id but the SAME idempotency_key. Use it for lineage and log correlation only."
+    },
+    {
+      "name": "idempotency_key",
+      "type": "string",
+      "doc": "Deterministic content hash; see kg_events.idempotency.derive_key. Two emissions of the same logical change hash identically, so at-least-once redelivery collapses. A genuine change to the same source record produces a different key because the payload hash changes."
+    },
+    {
+      "name": "partition_key",
+      "type": "string",
+      "doc": "Kafka message key: '<KEY_VERSION>:<hash>'. Entity-scoped, never source-scoped — see the ordering note in kg_events/README or partition_key_for(). All deltas touching one entity must land on one partition so entity resolution and bi-temporal writes stay strictly ordered."
+    },
+    {
+      "name": "entity_key",
+      "type": "string",
+      "doc": "Natural key of the subject this event is about (employee id, account number, document id). Chosen by the connector's mapping step; it is the unit of ordering, not of identity — identity is decided later by entity resolution."
+    },
+    {
+      "name": "sequence",
+      "type": "long",
+      "default": 0,
+      "doc": "Source-assigned monotonic version for this entity_key (Debezium LSN, DB rowversion, mtime). Lets a consumer detect and drop a delta that arrives after a newer one it already applied, which partition ordering alone cannot guarantee across a connector restart."
+    },
+
+
+    {
+      "name": "group_id",
+      "type": "string",
+      "doc": "Synapse graph isolation namespace. Usually derived from tenant_id; carried explicitly so the graph write never has to recompute it."
+    },
+    {
+      "name": "access_tag",
+      "type": {
+        "type": "enum",
+        "name": "AccessTag",
+        "symbols": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"],
+        "default": "INTERNAL"
+      },
+      "default": "INTERNAL",
+      "doc": "Sensitivity of the most sensitive field in the payload. Propagates to every graph fact derived from this event and drives ACL filtering at export."
+    },
+    {
+      "name": "pii_fields",
+      "type": {"type": "array", "items": "string"},
+      "default": [],
+      "doc": "Dotted paths into payload that hold PII. Declared at the connector because that is the only layer that knows the source column semantics. Downstream redaction and access control read this rather than re-detecting PII heuristically."
+    },
+
+    {
+      "name": "source",
+      "doc": "Where this came from, and how it was captured.",
+      "type": {
+        "type": "record",
+        "name": "SourceDescriptor",
+        "fields": [
+          {
+            "name": "system",
+            "type": {
+              "type": "enum",
+              "name": "SourceSystem",
+              "symbols": ["CRM", "ERP", "HRMS", "SQL", "CSV", "SLACK", "NOTION", "DOCS", "PDF", "GITHUB", "UPLOAD"],
+              "default": "UPLOAD"
+            },
+            "default": "UPLOAD"
+          },
+          {"name": "connector_id", "type": "string", "doc": "Which connector instance emitted this. Needed to attribute a bad shape to one deployment."},
+          {"name": "record_id", "type": "string", "doc": "Primary key in the source system."},
+          {"name": "record_version", "type": ["null", "string"], "default": null, "doc": "Source-side version/etag if the system exposes one."},
+          {
+            "name": "cdc_mode",
+            "type": {
+              "type": "enum",
+              "name": "CdcMode",
+              "symbols": ["LOG_BASED", "WEBHOOK", "POLLING", "FULL_SNAPSHOT", "MANUAL_UPLOAD"],
+              "default": "POLLING"
+            },
+            "default": "POLLING",
+            "doc": "How the change was detected. LOG_BASED (Debezium) is preferred wherever the source has a durable log, because polling cannot observe deletes or intra-interval churn."
+          },
+          {"name": "captured_at", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+        ]
+      }
+    },
+
+    {
+      "name": "lineage",
+      "doc": "End-to-end traceability from raw source record to resolved graph fact.",
+      "type": {
+        "type": "record",
+        "name": "Lineage",
+        "fields": [
+          {"name": "trace_id", "type": "string", "doc": "Stable across every stage this event passes through, including retries and DLQ replays."},
+          {"name": "parent_event_id", "type": ["null", "string"], "default": null, "doc": "Set when this event was derived from another (e.g. a re-emission after a DLQ fix)."},
+          {"name": "stage_path", "type": {"type": "array", "items": "string"}, "default": [], "doc": "Stages already traversed, appended in order. A DLQ message's stage_path shows exactly where it died."}
+        ]
+      }
+    },
+
+    {
+      "name": "operation",
+      "type": {
+        "type": "enum",
+        "name": "Operation",
+        "symbols": ["UPSERT", "DELETE"],
+        "default": "UPSERT"
+      },
+      "default": "UPSERT",
+      "doc": "DELETE carries an empty payload and instructs the graph layer to close facts for this entity_key rather than remove nodes — Synapse never destroys history."
+    },
+    {
+      "name": "payload",
+      "doc": "Exactly one of the two canonical shapes. Unstructured sources produce DocumentPayload after parsing/OCR; structured sources produce RecordPayload after mapping.",
+      "type": [
+        {
+          "type": "record",
+          "name": "DocumentPayload",
+          "fields": [
+            {"name": "name", "type": "string"},
+            {"name": "media_type", "type": "string", "default": "text/plain"},
+            {"name": "text", "type": "string", "doc": "Extracted text. Parsing/OCR has already run; downstream never re-parses bytes."},
+            {"name": "byte_size", "type": "long", "default": 0},
+            {"name": "uri", "type": ["null", "string"], "default": null, "doc": "Pointer to the original blob for re-parsing. The bytes themselves never ride the topic."},
+            {"name": "ocr_confidence", "type": ["null", "double"], "default": null, "doc": "Null when the source was born-digital. A low value is a signal for the Curation queue, not a reason to drop."}
+          ]
+        },
+        {
+          "type": "record",
+          "name": "RecordPayload",
+          "fields": [
+            {"name": "entity_type", "type": "string", "doc": "Ontology type this record maps to (Employee, Organization, ...). The mapping step assigns it; extraction validates it against the ontology."},
+            {"name": "fields", "type": {"type": "map", "values": ["null", "string"]}, "default": {}, "doc": "Flattened field map. Values are stringified at the connector so the wire type never depends on source-side type drift."},
+            {"name": "text_repr", "type": ["null", "string"], "default": null, "doc": "Optional natural-language rendering of the record, so structured and unstructured sources share one extraction path."}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "payload_hash",
+      "type": "string",
+      "doc": "SHA-256 of the canonicalised payload. Feeds the idempotency key and lets a consumer detect a no-op redelivery without deserialising the whole payload."
+    },
+
+    {
+      "name": "occurred_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"},
+      "doc": "When the change happened in the source system. This becomes valid_at on the resulting graph facts, so bi-temporal correctness depends on the connector getting it right."
+    },
+    {
+      "name": "emitted_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"},
+      "doc": "When the connector put it on the topic. emitted_at - occurred_at is the connector's capture lag."
+    }
+  ]
+}
